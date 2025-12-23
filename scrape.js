@@ -1,6 +1,6 @@
 import fs from "fs";
 import fetch from "node-fetch";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 
 const URL_BUSCADOR = "https://www.bcra.gob.ar/buscador-de-comunicaciones/";
 
