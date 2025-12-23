@@ -1,31 +1,51 @@
-import * as cheerio from "cheerio";
+import { chromium } from "playwright";
+import fs from "fs";
 
-const URL = "https://www.bcra.gob.ar/Comunicaciones/";
+const URL = "https://www.bcra.gob.ar/buscador-de-comunicaciones/";
 
-const res = await fetch(URL, {
-  headers: {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
-    "Accept-Language": "es-AR,es;q=0.9",
-  },
-});
+function hoy() {
+  const d = new Date();
+  return d.toLocaleDateString("es-AR");
+}
 
-const html = await res.text();
-const $ = cheerio.load(html);
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
 
-const links = [];
+  console.log("🌐 Abriendo sitio...");
+  await page.goto(URL, { waitUntil: "networkidle" });
 
-$("a[href]").each((_, el) => {
-  const href = $(el).attr("href");
+  const fecha = hoy();
+  console.log("📅 Fecha:", fecha);
 
-  if (
-    href &&
-    href.match(/^\/Comunicaciones\/[A-Z]/) &&
-    !href.endsWith(".pdf")
-  ) {
-    links.push("https://www.bcra.gob.ar" + href);
-  }
-});
+  // Completar fechas
+  await page.fill('input[name="desde"]', fecha);
+  await page.fill('input[name="hasta"]', fecha);
 
-console.log("📄 Comunicaciones encontradas:", links.length);
-links.slice(0, 10).forEach((l) => console.log(" -", l));
+  // Click buscar
+  await page.click("button:has-text('Buscar')");
+
+  // Esperar resultados
+  await page.waitForTimeout(4000);
+
+  const comunicaciones = await page.evaluate(() => {
+    const items = [];
+    document.querySelectorAll("article, .resultado, li").forEach(el => {
+      const titulo = el.querySelector("a")?.innerText?.trim();
+      const link = el.querySelector("a")?.href;
+      const texto = el.innerText?.trim();
+
+      if (titulo && link) {
+        items.push({ titulo, link, texto });
+      }
+    });
+    return items;
+  });
+
+  console.log(`📄 Comunicaciones encontradas: ${comunicaciones.length}`);
+
+  fs.writeFileSync("output.json", JSON.stringify(comunicaciones, null, 2));
+  console.log("✅ output.json generado");
+
+  await browser.close();
+})();
