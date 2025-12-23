@@ -18,13 +18,17 @@ function hoy() {
   console.log("🌐 Abriendo sitio...");
   await page.goto(URL, { waitUntil: "domcontentloaded" });
 
-  // Esperar inputs de fecha
-  await page.waitForSelector("input", { timeout: 30000 });
+  // Esperar que existan formularios
+  await page.waitForSelector('form[name="fecha"]', { timeout: 30000 });
 
   const fecha = hoy();
   console.log("📅 Fecha:", fecha);
 
-  const inputs = await page.$$("input");
+  // Tomar el formulario "Por fecha"
+  const formFecha = page.locator('form[name="fecha"]');
+
+  // Tomar inputs de ese formulario
+  const inputs = await formFecha.locator("input").all();
 
   if (inputs.length < 2) {
     throw new Error("No se encontraron inputs de fecha");
@@ -38,25 +42,24 @@ function hoy() {
   await inputs[1].click({ clickCount: 3 });
   await inputs[1].type(fecha, { delay: 50 });
 
-  // Click Buscar
-  await page.getByRole("button", { name: /buscar/i }).click();
+  // Click en el botón Buscar DEL FORM POR FECHA
+  await formFecha.getByRole("button", { name: "Buscar" }).click();
 
-  // Esperar render
-  await page.waitForTimeout(5000);
+  // Esperar que carguen resultados
+  await page.waitForTimeout(6000);
 
   const comunicaciones = await page.evaluate(() => {
     const results = [];
+
     document.querySelectorAll("a[href*='Comunicaciones']").forEach(a => {
       const titulo = a.innerText.trim();
       const link = a.href;
 
-      if (titulo.length > 10) {
-        results.push({
-          titulo,
-          link
-        });
+      if (titulo && titulo.length > 10) {
+        results.push({ titulo, link });
       }
     });
+
     return results;
   });
 
