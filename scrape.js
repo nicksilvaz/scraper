@@ -1,3 +1,5 @@
+import * as cheerio from "cheerio";
+
 const res = await fetch("https://www.bcra.gob.ar/buscador-de-comunicaciones/", {
   headers: {
     "User-Agent":
@@ -7,6 +9,13 @@ const res = await fetch("https://www.bcra.gob.ar/buscador-de-comunicaciones/", {
 });
 
 const html = await res.text();
+const $ = cheerio.load(html);
 
-console.log("HTML recibido, largo:", html.length);
-console.log(html.slice(0, 300));
+// Título de la página
+const title = $("title").text();
+
+// Cantidad de links
+const linksCount = $("a").length;
+
+console.log("📄 Title:", title);
+console.log("🔗 Cantidad de <a>:", linksCount);
