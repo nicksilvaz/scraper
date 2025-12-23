@@ -1,8 +1,8 @@
 import * as cheerio from "cheerio";
 
-const BASE_URL = "https://www.bcra.gob.ar";
+const URL = "https://www.bcra.gob.ar/Comunicaciones/";
 
-const res = await fetch("https://www.bcra.gob.ar/buscador-de-comunicaciones/", {
+const res = await fetch(URL, {
   headers: {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
@@ -20,13 +20,12 @@ $("a[href]").each((_, el) => {
 
   if (
     href &&
-    href.includes("/Comunicaciones/") &&
-    !links.includes(href)
+    href.match(/^\/Comunicaciones\/[A-Z]/) &&
+    !href.endsWith(".pdf")
   ) {
-    links.push(href.startsWith("http") ? href : BASE_URL + href);
+    links.push("https://www.bcra.gob.ar" + href);
   }
 });
 
-console.log("📄 Comunicaciones detectadas:", links.length);
-console.log("🔗 Primeros links:");
-links.slice(0, 5).forEach((l) => console.log(" -", l));
+console.log("📄 Comunicaciones encontradas:", links.length);
+links.slice(0, 10).forEach((l) => console.log(" -", l));
