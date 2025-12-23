@@ -1,85 +1,71 @@
-import fs from "fs";
 import * as cheerio from "cheerio";
+import fs from "fs";
 
-const URL_BUSCADOR = "https://www.bcra.gob.ar/buscador-de-comunicaciones/";
+const BASE_URL = "https://www.bcra.gob.ar";
+const SEARCH_URL = "https://www.bcra.gob.ar/buscador-de-comunicaciones/";
 
-function hoy() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
+function todayArgentina() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy}`;
 }
 
-async function main() {
-  console.log("Scrapeando BCRA…");
-
-  const res = await fetch(URL_BUSCADOR, {
+async function fetchHtml(url) {
+  const res = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0"
-    }
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
+      "Accept-Language": "es-AR,es;q=0.9",
+    },
   });
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
+    throw new Error(`Error ${res.status} al acceder a ${url}`);
   }
 
-  const html = await res.text();
+  return await res.text();
+}
+
+async function fetchBCRAComunicaciones() {
+  const fecha = todayArgentina();
+  console.log("📅 Buscando comunicaciones del:", fecha);
+
+  // El buscador carga resultados en la misma URL con POST,
+  // pero el HTML final incluye los links renderizados
+  const html = await fetchHtml(SEARCH_URL);
   const $ = cheerio.load(html);
 
-  const comunicaciones = [];
+  const links = [];
 
-  $("a").each((_, a) => {
-    const href = $(a).attr("href") || "";
-    const titulo = $(a).text().trim();
-
+  $("a").each((_, el) => {
+    const href = $(el).attr("href");
     if (
+      href &&
       href.includes("/Comunicaciones/") &&
-      titulo.toLowerCase().includes("comunicación")
+      !links.includes(href)
     ) {
-      comunicaciones.push({
-        titulo,
-        url: href.startsWith("http")
-          ? href
-          : "https://www.bcra.gob.ar" + href
-      });
+      links.push(href.startsWith("http") ? href : BASE_URL + href);
     }
   });
 
-  const resultados = [];
+  console.log(`🔗 Comunicaciones encontradas: ${links.length}`);
 
-  for (const c of comunicaciones) {
-    console.log("Leyendo:", c.titulo);
+  const results = [];
 
-    const r = await fetch(c.url, {
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
+  for (const link of links) {
+    try {
+      const detailHtml = await fetchHtml(link);
+      const $$ = cheerio.load(detailHtml);
 
-    if (!r.ok) continue;
+      const titulo =
+        $$("h1").first().text().trim() ||
+        $$("title").text().trim();
 
-    const detalleHtml = await r.text();
-    const $$ = cheerio.load(detalleHtml);
+      const contenido = $$("article").text().trim();
 
-    const contenido = $$(".contenido, .entry-content")
-      .text()
-      .replace(/\s+/g, " ")
-      .trim();
+      if (!titulo || !contenido) continue;
 
-    resultados.push({
-      fecha: hoy(),
-      titulo: c.titulo,
-      contenido,
-      url: c.url
-    });
-  }
-
-  fs.writeFileSync(
-    "output.json",
-    JSON.stringify(resultados, null, 2),
-    "utf8"
-  );
-
-  console.log(`OK – ${resultados.length} comunicaciones`);
-}
-
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+      results.push({
+        fecha,
