@@ -5,10 +5,10 @@ const BASE_URL = "https://www.bcra.gob.ar";
 const SEARCH_URL = "https://www.bcra.gob.ar/buscador-de-comunicaciones/";
 
 function todayArgentina() {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
 
@@ -22,7 +22,7 @@ async function fetchHtml(url) {
   });
 
   if (!res.ok) {
-    throw new Error(`Error ${res.status} al acceder a ${url}`);
+    throw new Error(`HTTP ${res.status} en ${url}`);
   }
 
   return await res.text();
@@ -30,34 +30,28 @@ async function fetchHtml(url) {
 
 async function fetchBCRAComunicaciones() {
   const fecha = todayArgentina();
-  console.log("📅 Buscando comunicaciones del:", fecha);
+  console.log("📅 Fecha:", fecha);
 
-  // El buscador carga resultados en la misma URL con POST,
-  // pero el HTML final incluye los links renderizados
   const html = await fetchHtml(SEARCH_URL);
   const $ = cheerio.load(html);
 
-  const links = [];
+  const links = new Set();
 
-  $("a").each((_, el) => {
+  $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
-    if (
-      href &&
-      href.includes("/Comunicaciones/") &&
-      !links.includes(href)
-    ) {
-      links.push(href.startsWith("http") ? href : BASE_URL + href);
+    if (href && href.includes("/Comunicaciones/")) {
+      links.add(href.startsWith("http") ? href : BASE_URL + href);
     }
   });
 
-  console.log(`🔗 Comunicaciones encontradas: ${links.length}`);
+  console.log("🔗 Links encontrados:", links.size);
 
   const results = [];
 
   for (const link of links) {
     try {
-      const detailHtml = await fetchHtml(link);
-      const $$ = cheerio.load(detailHtml);
+      const detail = await fetchHtml(link);
+      const $$ = cheerio.load(detail);
 
       const titulo =
         $$("h1").first().text().trim() ||
@@ -69,3 +63,6 @@ async function fetchBCRAComunicaciones() {
 
       results.push({
         fecha,
+        titulo,
+        contenido,
+        link,
